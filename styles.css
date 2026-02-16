@@ -836,17 +836,24 @@ p {
 .emotional-copy {
     max-width: 750px;
     margin: 0 auto 3rem;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
+    color: var(--text-white-soft);
+    line-height: 1.8;
+}
+
+.emotional-copy p {
     color: var(--text-white-soft);
 }
 
 .emotional-copy em {
-    color: var(--gold-300);
+    color: var(--gold-400);
     font-style: italic;
+    font-weight: 600;
 }
 
 .emotional-copy strong {
     color: white;
+    font-weight: 700;
 }
 
 .resort-stats-grid {
@@ -1748,6 +1755,28 @@ p {
 
     .steps-grid {
         grid-template-columns: 1fr;
+    }
+
+    .resort-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .resort-stat {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px;
+        text-align: left;
+    }
+
+    .stat-icon {
+        margin-bottom: 0;
+        font-size: 1.8rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
     }
 
     .final-trust-badges {
