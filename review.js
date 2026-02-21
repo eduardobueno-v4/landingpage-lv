@@ -1,12 +1,64 @@
 /* =============================================
-   REVIEW MODE — Feedback System JS
-   Commenting & Export functionality
+   REVIEW MODE — Sistema de Feedback Colaborativo
+   Backend: Supabase (tempo real, compartilhado)
    ============================================= */
+
+/* ─────────────────────────────────────────────
+   CONFIGURAÇÃO DO SUPABASE
+   ─────────────────────────────────────────────
+   INSTRUÇÕES (5 minutos):
+
+   1. Acesse https://supabase.com/ e crie uma conta grátis
+   2. Crie um novo projeto (escolha qualquer região)
+   3. Aguarde o banco inicializar (~1 min)
+   4. Vá em "SQL Editor" e execute o seguinte SQL para criar a tabela:
+
+      create table comments (
+        id         uuid default gen_random_uuid() primary key,
+        section_id text not null,
+        author     text not null,
+        text       text not null,
+        rating     int,
+        date       text,
+        created_at timestamptz default now()
+      );
+
+      alter table comments enable row level security;
+
+      create policy "Leitura pública"  on comments for select using (true);
+      create policy "Inserção pública" on comments for insert with check (true);
+      create policy "Exclusão pública" on comments for delete using (true);
+
+   5. Vá em "Project Settings" → "API"
+   6. Copie a "Project URL" e cole em SUPABASE_URL abaixo
+   7. Copie a "anon public" key e cole em SUPABASE_ANON_KEY abaixo
+   ───────────────────────────────────────────── */
+const SUPABASE_URL = 'https://mdldxswblphkpkwsrxzt.supabase.co';      // ← Ex: https://xyzxyz.supabase.co
+const SUPABASE_ANON_KEY = 'sb_publishable_aTduFG3j_kNww4-CPw-Grw_PhFuc7yA'; // ← chave anon/public
+
+/* ─────────────────────────────────────────────
+   CONFIGURAÇÃO DO EMAIL (EmailJS — opcional)
+   ─────────────────────────────────────────────
+   Para receber email a cada novo comentário:
+   1. Acesse https://www.emailjs.com/ (grátis, 200 emails/mês)
+   2. Conecte seu email em "Email Services"
+   3. Crie um template com as variáveis:
+      {{section_name}}, {{author_name}}, {{comment_text}},
+      {{comment_date}}, {{rating}}
+   4. Preencha as chaves abaixo
+   ───────────────────────────────────────────── */
+const EMAILJS_CONFIG = {
+    serviceId: 'YOUR_SERVICE_ID',
+    templateId: 'YOUR_TEMPLATE_ID',
+    publicKey: 'YOUR_PUBLIC_KEY',
+    notifyEmail: 'eduardo.bueno@v4company.com'
+};
+
+/* ============================================= */
 
 (function () {
     'use strict';
 
-    // ---- Section Configuration ----
     const SECTIONS = [
         { selector: '#hero', label: 'Seção 1 — Hero' },
         { selector: '.social-proof-bar', label: 'Seção 2 — Social Proof' },
@@ -24,54 +76,143 @@
         { selector: '.main-footer', label: 'Seção 14 — Footer' }
     ];
 
-    const STORAGE_KEY = 'lp_review_comments';
-
-    // ---- EmailJS Configuration ----
-    // INSTRUÇÕES DE CONFIGURAÇÃO:
-    // 1. Acesse https://www.emailjs.com/ e crie uma conta gratuita (200 emails/mês)
-    // 2. Em "Email Services", conecte seu email (Gmail, Outlook, etc.)
-    // 3. Copie o "Service ID" e cole abaixo em EMAILJS_SERVICE_ID
-    // 4. Em "Email Templates", crie um template com estas variáveis:
-    //    - {{section_name}} = nome da seção comentada
-    //    - {{author_name}} = nome de quem comentou
-    //    - {{comment_text}} = texto do comentário
-    //    - {{comment_date}} = data do comentário
-    //    - {{to_email}} = email de destino (preenchido automaticamente)
-    // 5. Copie o "Template ID" e cole abaixo em EMAILJS_TEMPLATE_ID
-    // 6. Em "Account" > "General", copie o "Public Key" e cole em EMAILJS_PUBLIC_KEY
-    const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';   // ← Substituir
-    const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID'; // ← Substituir
-    const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';    // ← Substituir
-    const NOTIFY_EMAIL = 'eduardo.bueno@v4company.com';
-
-    // ---- State ----
     let reviewActive = false;
     let currentSectionId = null;
+    let selectedRating = 0;
+    let supabase = null;
+    let realtimeChannel = null;
 
-    // ---- Init ----
     document.addEventListener('DOMContentLoaded', initReviewMode);
 
     function initReviewMode() {
-        initEmailJS();
+        prepareSections();
         createToggleButton();
         createModal();
         createExportBar();
         createToast();
-        prepareSections();
-        loadAndRenderComments();
+        initSupabase();
     }
 
-    // ---- Initialize EmailJS ----
-    function initEmailJS() {
-        if (typeof emailjs !== 'undefined' && EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
-            emailjs.init(EMAILJS_PUBLIC_KEY);
-            console.log('✅ EmailJS inicializado — notificações por email ativas');
-        } else if (EMAILJS_PUBLIC_KEY === 'YOUR_PUBLIC_KEY') {
-            console.warn('⚠️ EmailJS não configurado. Configure as chaves em review.js para ativar notificações por email.');
+    /* ─────────────────────────────────────────
+       SUPABASE
+    ───────────────────────────────────────── */
+    function initSupabase() {
+        if (SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+            console.warn('⚠️  Supabase não configurado. Abra review.js e preencha SUPABASE_URL e SUPABASE_ANON_KEY.');
+            showConfigBanner();
+            return;
         }
+
+        if (typeof window.supabase === 'undefined') {
+            console.error('❌ Supabase SDK não encontrado. Verifique o index.html.');
+            return;
+        }
+
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('✅ Supabase conectado — comentários colaborativos ativos');
+
+        loadAllComments();
+        subscribeToRealtime();
     }
 
-    // ---- Create Toggle Button ----
+    async function loadAllComments() {
+        if (!supabase) return;
+
+        const { data, error } = await supabase
+            .from('comments')
+            .select('*')
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error('Erro ao carregar comentários:', error.message);
+            return;
+        }
+
+        // Agrupa por section_id e renderiza
+        const grouped = {};
+        (data || []).forEach(c => {
+            if (!grouped[c.section_id]) grouped[c.section_id] = [];
+            grouped[c.section_id].push(c);
+        });
+
+        SECTIONS.forEach(sec => {
+            const sectionComments = grouped[sec.selector] || [];
+            renderSectionComments(sec.selector, sectionComments);
+            updateCommentCount(sec.selector, sectionComments.length);
+        });
+
+        updateExportBar();
+    }
+
+    function subscribeToRealtime() {
+        if (!supabase) return;
+
+        // Remove canal anterior se existir
+        if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+
+        realtimeChannel = supabase
+            .channel('comments-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => {
+                // Qualquer mudança → recarrega tudo
+                loadAllComments();
+            })
+            .subscribe();
+    }
+
+    async function saveComment(sectionId, comment) {
+        if (!supabase) {
+            showToast('⚠️ Supabase não configurado.');
+            return false;
+        }
+
+        const { error } = await supabase.from('comments').insert([{
+            section_id: sectionId,
+            author: comment.author,
+            text: comment.text,
+            rating: comment.rating || null,
+            date: comment.date
+        }]);
+
+        if (error) {
+            console.error('Erro ao salvar comentário:', error.message);
+            showToast('❌ Erro ao salvar. Tente novamente.');
+            return false;
+        }
+        return true;
+    }
+
+    async function deleteComment(commentId) {
+        if (!supabase) return;
+        const { error } = await supabase
+            .from('comments')
+            .delete()
+            .eq('id', commentId);
+        if (error) console.error('Erro ao excluir:', error.message);
+    }
+
+    async function fetchAllForExport() {
+        if (!supabase) return [];
+        const { data, error } = await supabase
+            .from('comments')
+            .select('*')
+            .order('created_at', { ascending: true });
+        if (error) return [];
+        return data || [];
+    }
+
+    async function clearAll() {
+        if (!supabase) return;
+        // Deleta tudo (não há filtro = todos os registros)
+        const { error } = await supabase
+            .from('comments')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // deleta todos
+        if (error) console.error('Erro ao limpar:', error.message);
+    }
+
+    /* ─────────────────────────────────────────
+       TOGGLE REVIEW MODE
+    ───────────────────────────────────────── */
     function createToggleButton() {
         const btn = document.createElement('button');
         btn.className = 'review-toggle';
@@ -81,12 +222,10 @@
         document.body.appendChild(btn);
     }
 
-    // ---- Toggle Review Mode ----
     function toggleReviewMode() {
         reviewActive = !reviewActive;
         const btn = document.getElementById('reviewToggle');
         const body = document.body;
-
         if (reviewActive) {
             body.classList.add('review-active');
             btn.classList.add('active');
@@ -96,28 +235,26 @@
             btn.classList.remove('active');
             btn.innerHTML = '<i class="fas fa-comments"></i> <span>Modo Review</span>';
         }
-
         updateExportBar();
     }
 
-    // ---- Prepare Sections ----
+    /* ─────────────────────────────────────────
+       SECTIONS
+    ───────────────────────────────────────── */
     function prepareSections() {
-        SECTIONS.forEach((sec, index) => {
+        SECTIONS.forEach(sec => {
             const el = document.querySelector(sec.selector);
             if (!el) return;
 
-            // Mark as review section
             el.classList.add('review-section');
             el.dataset.reviewId = sec.selector;
             el.style.position = el.style.position || 'relative';
 
-            // Label
             const label = document.createElement('div');
             label.className = 'review-section-label';
             label.innerHTML = '<i class="fas fa-layer-group"></i> ' + sec.label;
             el.appendChild(label);
 
-            // Comment button
             const commentBtn = document.createElement('button');
             commentBtn.className = 'review-comment-btn';
             commentBtn.innerHTML = '💬 Comentar';
@@ -127,7 +264,6 @@
             });
             el.appendChild(commentBtn);
 
-            // Comments list container
             const commentsList = document.createElement('div');
             commentsList.className = 'review-comments-list';
             commentsList.id = 'comments-' + sanitizeId(sec.selector);
@@ -135,7 +271,9 @@
         });
     }
 
-    // ---- Modal ----
+    /* ─────────────────────────────────────────
+       MODAL
+    ───────────────────────────────────────── */
     function createModal() {
         const overlay = document.createElement('div');
         overlay.className = 'review-modal-overlay';
@@ -153,8 +291,18 @@
                     <label for="reviewAuthor">Seu Nome</label>
                     <input type="text" id="reviewAuthor" placeholder="Ex: Eduardo, Maria..." autocomplete="off" />
 
-                    <label for="reviewComment">Comentário</label>
-                    <textarea id="reviewComment" placeholder="Escreva seu feedback sobre copy, layout, texto..."></textarea>
+                    <label>Avaliação desta seção</label>
+                    <div class="review-rating" id="reviewRating">
+                        <button class="rating-star" data-value="1" title="Ruim">★</button>
+                        <button class="rating-star" data-value="2" title="Regular">★</button>
+                        <button class="rating-star" data-value="3" title="Bom">★</button>
+                        <button class="rating-star" data-value="4" title="Muito bom">★</button>
+                        <button class="rating-star" data-value="5" title="Excelente">★</button>
+                        <span class="rating-label" id="ratingLabel">Sem avaliação</span>
+                    </div>
+
+                    <label for="reviewComment">Comentário / Feedback</label>
+                    <textarea id="reviewComment" placeholder="O que achou desta seção? Copy, layout, texto..."></textarea>
 
                     <button class="review-modal-submit" id="reviewSubmit">
                         <i class="fas fa-paper-plane"></i> Enviar Comentário
@@ -164,33 +312,53 @@
         `;
         document.body.appendChild(overlay);
 
-        // Close modal on overlay click
-        overlay.addEventListener('click', function (e) {
-            if (e.target === overlay) closeModal();
-        });
-
+        overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
         document.getElementById('modalClose').addEventListener('click', closeModal);
         document.getElementById('reviewSubmit').addEventListener('click', submitComment);
-
-        // Submit on Enter (in textarea with Ctrl/Cmd+Enter)
         document.getElementById('reviewComment').addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                submitComment();
-            }
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submitComment();
+        });
+
+        initRatingStars();
+    }
+
+    function initRatingStars() {
+        const stars = document.querySelectorAll('.rating-star');
+        const label = document.getElementById('ratingLabel');
+        const labels = ['', 'Ruim', 'Regular', 'Bom', 'Muito bom', 'Excelente'];
+
+        stars.forEach(star => {
+            star.addEventListener('mouseover', function () {
+                const v = parseInt(this.dataset.value);
+                highlightStars(v);
+                label.textContent = labels[v];
+            });
+            star.addEventListener('mouseout', function () {
+                highlightStars(selectedRating);
+                label.textContent = selectedRating ? labels[selectedRating] : 'Sem avaliação';
+            });
+            star.addEventListener('click', function () {
+                selectedRating = parseInt(this.dataset.value);
+                label.textContent = labels[selectedRating];
+            });
+        });
+    }
+
+    function highlightStars(count) {
+        document.querySelectorAll('.rating-star').forEach((s, i) => {
+            s.classList.toggle('active', i < count);
         });
     }
 
     function openModal(sectionId, sectionLabel) {
         currentSectionId = sectionId;
+        selectedRating = 0;
+        highlightStars(0);
+        document.getElementById('ratingLabel').textContent = 'Sem avaliação';
         document.getElementById('modalSectionName').textContent = sectionLabel;
+        document.getElementById('reviewComment').value = '';
         document.getElementById('reviewModalOverlay').classList.add('visible');
-
-        // Focus on name input
-        setTimeout(() => {
-            const authorInput = document.getElementById('reviewAuthor');
-            // Keep last used name
-            authorInput.focus();
-        }, 100);
+        setTimeout(() => document.getElementById('reviewAuthor').focus(), 100);
     }
 
     function closeModal() {
@@ -199,129 +367,91 @@
         currentSectionId = null;
     }
 
-    function submitComment() {
+    async function submitComment() {
         const author = document.getElementById('reviewAuthor').value.trim();
         const text = document.getElementById('reviewComment').value.trim();
 
-        if (!author) {
-            document.getElementById('reviewAuthor').focus();
-            document.getElementById('reviewAuthor').style.borderColor = '#ef4444';
-            setTimeout(() => {
-                document.getElementById('reviewAuthor').style.borderColor = '';
-            }, 2000);
-            return;
-        }
+        if (!author) { shakeInput('reviewAuthor'); return; }
+        if (!text) { shakeInput('reviewComment'); return; }
 
-        if (!text) {
-            document.getElementById('reviewComment').focus();
-            document.getElementById('reviewComment').style.borderColor = '#ef4444';
-            setTimeout(() => {
-                document.getElementById('reviewComment').style.borderColor = '';
-            }, 2000);
-            return;
-        }
+        const btn = document.getElementById('reviewSubmit');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
 
         const comment = {
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-            sectionId: currentSectionId,
-            author: author,
-            text: text,
+            author,
+            text,
+            rating: selectedRating || null,
             date: new Date().toLocaleString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
             })
         };
 
-        saveComment(comment);
-        renderSectionComments(currentSectionId);
-        updateExportBar();
-
-        // Find section label for email
         const sectionConfig = SECTIONS.find(s => s.selector === currentSectionId);
         const sectionLabel = sectionConfig ? sectionConfig.label : currentSectionId;
 
-        // Send email notification
-        sendEmailNotification(comment, sectionLabel);
+        const saved = await saveComment(currentSectionId, comment);
 
-        closeModal();
-        showToast('Comentário salvo com sucesso!');
-    }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Comentário';
 
-    // ---- LocalStorage ----
-    function getComments() {
-        try {
-            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-        } catch {
-            return [];
+        if (saved) {
+            closeModal();
+            showToast('✅ Comentário salvo e compartilhado!');
+            sendEmailNotification({ ...comment, sectionLabel });
         }
     }
 
-    function saveComment(comment) {
-        const comments = getComments();
-        comments.push(comment);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(comments));
+    function shakeInput(id) {
+        const el = document.getElementById(id);
+        el.style.borderColor = '#ef4444';
+        el.focus();
+        setTimeout(() => el.style.borderColor = '', 1200);
     }
 
-    function deleteComment(commentId) {
-        let comments = getComments();
-        comments = comments.filter(c => c.id !== commentId);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(comments));
-    }
-
-    function clearAllComments() {
-        localStorage.removeItem(STORAGE_KEY);
-    }
-
-    // ---- Render Comments ----
-    function loadAndRenderComments() {
-        SECTIONS.forEach(sec => {
-            renderSectionComments(sec.selector);
-        });
-        updateExportBar();
-    }
-
-    function renderSectionComments(sectionId) {
-        const containerId = 'comments-' + sanitizeId(sectionId);
-        const container = document.getElementById(containerId);
+    /* ─────────────────────────────────────────
+       RENDER
+    ───────────────────────────────────────── */
+    function renderSectionComments(sectionId, comments) {
+        const container = document.getElementById('comments-' + sanitizeId(sectionId));
         if (!container) return;
 
-        const comments = getComments().filter(c => c.sectionId === sectionId);
-
-        if (comments.length === 0) {
+        if (!comments || comments.length === 0) {
             container.innerHTML = '';
-            updateCommentCount(sectionId, 0);
             return;
         }
 
-        let html = '<h4><i class="fas fa-comments"></i> Comentários desta seção (' + comments.length + ')</h4>';
+        const stars = n => n ? '<span class="comment-stars">' + '★'.repeat(n) + '☆'.repeat(5 - n) + '</span>' : '';
+
+        let html = `<h4><i class="fas fa-comments"></i> Comentários desta seção (${comments.length})</h4>`;
 
         comments.forEach(c => {
             html += `
                 <div class="review-comment-card" data-comment-id="${c.id}">
                     <div class="comment-meta">
-                        <span class="comment-author"><i class="fas fa-user"></i> ${escapeHtml(c.author)}</span>
-                        <span class="comment-date">${c.date}</span>
+                        <div class="comment-author-wrap">
+                            <span class="comment-author"><i class="fas fa-user"></i> ${escapeHtml(c.author)}</span>
+                            ${stars(c.rating)}
+                        </div>
+                        <span class="comment-date">${c.date || ''}</span>
                     </div>
                     <p class="comment-text">${escapeHtml(c.text)}</p>
-                    <button class="comment-delete" data-id="${c.id}"><i class="fas fa-trash-alt"></i> Excluir</button>
+                    <button class="comment-delete" data-id="${c.id}">
+                        <i class="fas fa-trash-alt"></i> Excluir
+                    </button>
                 </div>
             `;
         });
 
         container.innerHTML = html;
-        updateCommentCount(sectionId, comments.length);
 
-        // Bind delete buttons
         container.querySelectorAll('.comment-delete').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const id = this.dataset.id;
-                deleteComment(id);
-                renderSectionComments(sectionId);
-                updateExportBar();
-                showToast('Comentário excluído');
+            btn.addEventListener('click', async function () {
+                if (confirm('Excluir este comentário para todos os usuários?')) {
+                    await deleteComment(this.dataset.id);
+                    showToast('Comentário excluído');
+                }
             });
         });
     }
@@ -329,18 +459,16 @@
     function updateCommentCount(sectionId, count) {
         const section = document.querySelector(sectionId);
         if (!section) return;
-
         const btn = section.querySelector('.review-comment-btn');
         if (!btn) return;
-
-        if (count > 0) {
-            btn.innerHTML = '💬 Comentar <span class="review-comment-count">' + count + '</span>';
-        } else {
-            btn.innerHTML = '💬 Comentar';
-        }
+        btn.innerHTML = count > 0
+            ? `💬 Comentar <span class="review-comment-count">${count}</span>`
+            : '💬 Comentar';
     }
 
-    // ---- Export Bar ----
+    /* ─────────────────────────────────────────
+       EXPORT BAR
+    ───────────────────────────────────────── */
     function createExportBar() {
         const bar = document.createElement('div');
         bar.className = 'review-export-bar';
@@ -362,132 +490,152 @@
         document.body.appendChild(bar);
 
         document.getElementById('exportCopy').addEventListener('click', exportComments);
-        document.getElementById('exportClear').addEventListener('click', function () {
-            if (confirm('Tem certeza que deseja excluir TODOS os comentários? Essa ação não pode ser desfeita.')) {
-                clearAllComments();
-                SECTIONS.forEach(sec => renderSectionComments(sec.selector));
-                updateExportBar();
+        document.getElementById('exportClear').addEventListener('click', async function () {
+            if (confirm('Excluir TODOS os comentários para todos os usuários? Essa ação não pode ser desfeita.')) {
+                await clearAll();
                 showToast('Todos os comentários foram removidos');
             }
         });
     }
 
     function updateExportBar() {
-        const total = getComments().length;
-        const countEl = document.getElementById('exportCount');
-        if (countEl) countEl.textContent = total;
+        let total = 0;
+        SECTIONS.forEach(sec => {
+            const c = document.getElementById('comments-' + sanitizeId(sec.selector));
+            if (c) total += c.querySelectorAll('.review-comment-card').length;
+        });
+        const el = document.getElementById('exportCount');
+        if (el) el.textContent = total;
     }
 
-    // ---- Export Comments ----
-    function exportComments() {
-        const comments = getComments();
-        if (comments.length === 0) {
+    async function exportComments() {
+        showToast('⏳ Carregando comentários...');
+        const all = await fetchAllForExport();
+
+        if (!all.length) {
             showToast('Nenhum comentário para exportar');
             return;
         }
 
-        // Group by section
+        const sectionMap = {};
+        SECTIONS.forEach(s => { sectionMap[s.selector] = s.label; });
+
         const grouped = {};
-        SECTIONS.forEach(sec => {
-            const sectionComments = comments.filter(c => c.sectionId === sec.selector);
-            if (sectionComments.length > 0) {
-                grouped[sec.label] = sectionComments;
-            }
+        all.forEach(c => {
+            const label = sectionMap[c.section_id] || c.section_id;
+            if (!grouped[label]) grouped[label] = [];
+            grouped[label].push(c);
         });
 
-        let output = '═══════════════════════════════════════\n';
-        output += '  FEEDBACK DA LANDING PAGE\n';
-        output += '  Exportado em: ' + new Date().toLocaleString('pt-BR') + '\n';
-        output += '═══════════════════════════════════════\n\n';
+        const ratingText = n => n ? ` | Avaliação: ${'★'.repeat(n)} (${n}/5)` : '';
 
-        for (const [sectionLabel, sectionComments] of Object.entries(grouped)) {
-            output += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
-            output += '📌 ' + sectionLabel + '\n';
-            output += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+        let out = '═══════════════════════════════════════\n';
+        out += '  FEEDBACK DA LANDING PAGE\n';
+        out += '  Exportado em: ' + new Date().toLocaleString('pt-BR') + '\n';
+        out += '═══════════════════════════════════════\n\n';
 
-            sectionComments.forEach((c, i) => {
-                output += '  ✏️ Comentário ' + (i + 1) + '\n';
-                output += '  Autor: ' + c.author + '\n';
-                output += '  Data: ' + c.date + '\n';
-                output += '  Feedback: ' + c.text + '\n\n';
+        for (const [sectionLabel, comments] of Object.entries(grouped)) {
+            out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            out += '📌 ' + sectionLabel + '\n';
+            out += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+            comments.forEach((c, i) => {
+                out += `  ✏️ Comentário ${i + 1}\n`;
+                out += `  Autor: ${c.author}\n`;
+                out += `  Data: ${c.date || 'N/A'}${ratingText(c.rating)}\n`;
+                out += `  Feedback: ${c.text}\n\n`;
             });
         }
 
-        output += '═══════════════════════════════════════\n';
-        output += '  Total de comentários: ' + comments.length + '\n';
-        output += '═══════════════════════════════════════\n';
+        out += '═══════════════════════════════════════\n';
+        out += '  Total: ' + all.length + ' comentário(s)\n';
+        out += '═══════════════════════════════════════\n';
 
-        // Copy to clipboard
-        navigator.clipboard.writeText(output).then(() => {
-            showToast('Feedback copiado para a área de transferência!');
-        }).catch(() => {
-            // Fallback for older browsers
-            const textarea = document.createElement('textarea');
-            textarea.value = output;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            showToast('Feedback copiado para a área de transferência!');
-        });
+        navigator.clipboard.writeText(out)
+            .then(() => showToast('📋 Feedback copiado para a área de transferência!'))
+            .catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = out;
+                ta.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('📋 Feedback copiado!');
+            });
     }
 
-    // ---- Toast ----
-    function createToast() {
-        const toast = document.createElement('div');
-        toast.className = 'review-toast';
-        toast.id = 'reviewToast';
-        document.body.appendChild(toast);
-    }
+    /* ─────────────────────────────────────────
+       EMAIL NOTIFICATION (EmailJS)
+    ───────────────────────────────────────── */
+    function sendEmailNotification(comment) {
+        if (
+            typeof emailjs === 'undefined' ||
+            EMAILJS_CONFIG.publicKey === 'YOUR_PUBLIC_KEY' ||
+            EMAILJS_CONFIG.serviceId === 'YOUR_SERVICE_ID'
+        ) return;
 
-    function showToast(message) {
-        const toast = document.getElementById('reviewToast');
-        toast.innerHTML = '<i class="fas fa-check-circle"></i> ' + message;
-        toast.classList.add('visible');
-        setTimeout(() => toast.classList.remove('visible'), 3000);
-    }
-
-    // ---- Email Notification ----
-    function sendEmailNotification(comment, sectionLabel) {
-        // Check if EmailJS is configured
-        if (typeof emailjs === 'undefined' ||
-            EMAILJS_PUBLIC_KEY === 'YOUR_PUBLIC_KEY' ||
-            EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID' ||
-            EMAILJS_TEMPLATE_ID === 'YOUR_TEMPLATE_ID') {
-            console.log('📧 Email não enviado (EmailJS não configurado). Comentário salvo localmente.');
-            return;
-        }
-
-        const templateParams = {
-            to_email: NOTIFY_EMAIL,
-            section_name: sectionLabel,
+        emailjs.init(EMAILJS_CONFIG.publicKey);
+        emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+            to_email: EMAILJS_CONFIG.notifyEmail,
+            section_name: comment.sectionLabel,
             author_name: comment.author,
             comment_text: comment.text,
-            comment_date: comment.date
-        };
-
-        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
-            .then(function () {
-                console.log('✅ Notificação enviada para ' + NOTIFY_EMAIL);
-                showToast('📧 Notificação enviada por email!');
-            })
-            .catch(function (error) {
-                console.error('❌ Erro ao enviar email:', error);
-                showToast('⚠️ Comentário salvo, mas email não foi enviado');
-            });
+            comment_date: comment.date,
+            rating: comment.rating ? comment.rating + '/5 ★' : 'Sem avaliação'
+        }).catch(err => console.error('EmailJS error:', err));
     }
 
-    // ---- Utilities ----
+    /* ─────────────────────────────────────────
+       TOAST
+    ───────────────────────────────────────── */
+    function createToast() {
+        if (document.getElementById('reviewToast')) return;
+        const t = document.createElement('div');
+        t.className = 'review-toast';
+        t.id = 'reviewToast';
+        document.body.appendChild(t);
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('reviewToast');
+        if (!t) return;
+        t.innerHTML = msg;
+        t.classList.add('visible');
+        setTimeout(() => t.classList.remove('visible'), 3500);
+    }
+
+    /* ─────────────────────────────────────────
+       CONFIG BANNER
+    ───────────────────────────────────────── */
+    function showConfigBanner() {
+        if (document.getElementById('reviewConfigBanner')) return;
+        const b = document.createElement('div');
+        b.id = 'reviewConfigBanner';
+        b.innerHTML = `
+            <div class="config-banner-content">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span><strong>Supabase não configurado.</strong>
+                Comentários são salvos apenas localmente.
+                Configure <code>review.js</code> para ativar o modo colaborativo.</span>
+                <button onclick="document.getElementById('reviewConfigBanner').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        document.body.appendChild(b);
+    }
+
+    /* ─────────────────────────────────────────
+       UTILITIES
+    ───────────────────────────────────────── */
     function sanitizeId(str) {
         return str.replace(/[^a-zA-Z0-9]/g, '-').replace(/^-+|-+$/g, '');
     }
 
     function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
     }
 
 })();
