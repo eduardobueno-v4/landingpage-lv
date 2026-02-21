@@ -1,0 +1,488 @@
+/* =============================================
+   REVIEW MODE — Feedback System CSS
+   Overlay system for stakeholder review
+   ============================================= */
+
+/* ---- Review Toggle Button ---- */
+.review-toggle {
+    position: fixed;
+    top: 90px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 24px rgba(99, 102, 241, 0.4);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    white-space: nowrap;
+}
+
+.review-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.5);
+}
+
+.review-toggle.active {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    box-shadow: 0 4px 24px rgba(239, 68, 68, 0.4);
+}
+
+.review-toggle.active:hover {
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.5);
+}
+
+.review-toggle i {
+    font-size: 1.1rem;
+}
+
+/* ---- Section Highlight (Review Mode Active) ---- */
+.review-active .review-section {
+    position: relative;
+    outline: 2px dashed rgba(99, 102, 241, 0.5);
+    outline-offset: -2px;
+    transition: outline-color 0.3s ease;
+}
+
+.review-active .review-section:hover {
+    outline-color: rgba(99, 102, 241, 0.9);
+}
+
+/* ---- Section Label ---- */
+.review-section-label {
+    display: none;
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 100;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border-radius: 6px;
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3);
+    pointer-events: none;
+}
+
+.review-active .review-section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ---- Comment Button (per section) ---- */
+.review-comment-btn {
+    display: none;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 100;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #f59e0b;
+    color: #1a1a2e;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.review-comment-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.5);
+}
+
+.review-active .review-comment-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ---- Comment Count Badge ---- */
+.review-comment-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: #1a1a2e;
+    color: #f59e0b;
+    font-size: 0.7rem;
+    font-weight: 800;
+    border-radius: 50px;
+}
+
+/* ---- Existing Comments Bar (under each section) ---- */
+.review-comments-list {
+    display: none;
+    margin: 0;
+    padding: 20px 24px;
+    background: #f8f7ff;
+    border-top: 3px solid #6366f1;
+}
+
+.review-active .review-comments-list {
+    display: block;
+}
+
+.review-comments-list:empty {
+    display: none !important;
+}
+
+.review-comments-list h4 {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #6366f1;
+    margin-bottom: 12px;
+}
+
+.review-comment-card {
+    background: white;
+    border: 1px solid #e5e5f0;
+    border-left: 4px solid #6366f1;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    font-family: 'Inter', sans-serif;
+    transition: transform 0.2s ease;
+}
+
+.review-comment-card:hover {
+    transform: translateX(4px);
+}
+
+.review-comment-card .comment-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.review-comment-card .comment-author {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.review-comment-card .comment-date {
+    font-size: 0.7rem;
+    color: #9ca3af;
+}
+
+.review-comment-card .comment-text {
+    font-size: 0.85rem;
+    color: #374151;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.review-comment-card .comment-delete {
+    display: inline-block;
+    margin-top: 6px;
+    background: none;
+    border: none;
+    color: #ef4444;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 0;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.review-comment-card .comment-delete:hover {
+    opacity: 1;
+}
+
+/* ---- Modal Overlay ---- */
+.review-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.review-modal-overlay.visible {
+    display: flex;
+}
+
+.review-modal {
+    width: 100%;
+    max-width: 520px;
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.review-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+}
+
+.review-modal-header h3 {
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.review-modal-header .section-name {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 400;
+    opacity: 0.85;
+    margin-top: 2px;
+}
+
+.review-modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.review-modal-close:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.review-modal-body {
+    padding: 24px;
+}
+
+.review-modal-body label {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.review-modal-body input,
+.review-modal-body textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e5e5f0;
+    border-radius: 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    color: #1a1a2e;
+    transition: border-color 0.2s ease;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.review-modal-body input:focus,
+.review-modal-body textarea:focus {
+    border-color: #6366f1;
+}
+
+.review-modal-body input {
+    margin-bottom: 16px;
+}
+
+.review-modal-body textarea {
+    min-height: 120px;
+    resize: vertical;
+    margin-bottom: 20px;
+}
+
+.review-modal-submit {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.review-modal-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+}
+
+/* ---- Export Panel ---- */
+.review-export-bar {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    padding: 14px 24px;
+    background: #1a1a2e;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.review-active .review-export-bar {
+    display: flex;
+}
+
+.review-export-bar .export-info {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.review-export-bar .export-info strong {
+    color: #f59e0b;
+}
+
+.review-export-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.review-export-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.review-export-btn.btn-copy {
+    background: #6366f1;
+    color: white;
+}
+
+.review-export-btn.btn-copy:hover {
+    background: #4f46e5;
+}
+
+.review-export-btn.btn-clear {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.review-export-btn.btn-clear:hover {
+    background: rgba(239, 68, 68, 0.3);
+}
+
+/* ---- Toast Notification ---- */
+.review-toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    z-index: 10001;
+    padding: 12px 24px;
+    background: #1a1a2e;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.review-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.review-toast i {
+    margin-right: 8px;
+    color: #22c55e;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 768px) {
+    .review-toggle {
+        top: auto;
+        bottom: 80px;
+        right: 16px;
+        padding: 10px 16px;
+        font-size: 0.8rem;
+    }
+
+    .review-section-label {
+        font-size: 0.65rem;
+        padding: 4px 10px;
+    }
+
+    .review-comment-btn {
+        font-size: 0.72rem;
+        padding: 6px 12px;
+    }
+
+    .review-export-bar {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+        padding-bottom: 20px;
+    }
+
+    .review-modal {
+        max-width: 100%;
+        margin: 10px;
+    }
+}
