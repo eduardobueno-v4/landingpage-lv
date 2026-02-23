@@ -1027,8 +1027,117 @@ p {
     font-style: normal;
 }
 
-.resort-card .btn-card {
+.card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     margin-top: auto;
+}
+
+.resort-card .btn-card {
+    margin-top: 0;
+}
+
+.btn-gallery {
+    background: transparent;
+    border: 1px solid var(--emerald-200);
+    color: var(--emerald-700);
+    padding: 10px 20px;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    transition: all var(--transition-base);
+    text-decoration: none;
+}
+
+.btn-gallery:hover {
+    background: var(--emerald-50);
+    border-color: var(--emerald-300);
+}
+
+/* ---- Mercado Pago Box in Problem Section ---- */
+.mercado-pago-box {
+    margin-top: 30px;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-left: 4px solid #009ee3;
+    border-radius: var(--radius-md);
+    padding: 20px;
+    text-align: left;
+}
+
+.mp-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.mp-header i {
+    color: #009ee3;
+    font-size: 1.2rem;
+}
+
+.mp-header strong {
+    color: var(--emerald-900);
+    font-size: 1.05rem;
+}
+
+.mercado-pago-box p {
+    font-size: 0.95rem;
+    color: var(--text-body);
+    margin-bottom: 12px;
+}
+
+.mp-details {
+    background: white;
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-body);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.mp-details summary {
+    font-weight: 600;
+    color: var(--emerald-700);
+    outline: none;
+    user-select: none;
+}
+
+.mp-details-content {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--sand-200);
+}
+
+.mp-details-content ul {
+    list-style: none;
+    padding-left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mp-details-content li {
+    position: relative;
+    padding-left: 20px;
+    line-height: 1.5;
+}
+
+.mp-details-content li::before {
+    content: "✓";
+    color: #009ee3;
+    font-weight: bold;
+    position: absolute;
+    left: 0;
+    top: 0;
 }
 
 .resort-cta-box {
