@@ -487,6 +487,71 @@
     }
 }
 
+/* ---- Review Mode: Fix overflow-hidden sections ---- */
+/* Hero and other sections with overflow:hidden clip the review buttons.
+   When review mode is active we override overflow so buttons are visible. */
+.review-active .hero.review-section,
+.review-active .resorts-hero.review-section {
+    overflow: visible;
+}
+
+/* ---- Review Mode: Fixed Header adjustments ---- */
+/* Keep label and button INSIDE the 72px header bar. */
+.review-active .main-header.review-section {
+    z-index: 9990;
+    overflow: visible;
+}
+
+.review-active .main-header.review-section>.review-section-label {
+    top: 22px !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: 350px !important;
+    z-index: 9991;
+    font-size: 0.6rem;
+    padding: 3px 10px;
+    white-space: nowrap;
+    pointer-events: auto;
+}
+
+.review-active .main-header.review-section>.review-comment-btn {
+    top: 18px !important;
+    bottom: auto !important;
+    right: 260px !important;
+    left: auto !important;
+    z-index: 9991;
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    white-space: nowrap;
+}
+
+.review-active .main-header.review-section>.review-comments-list {
+    position: absolute;
+    top: 72px !important;
+    left: 0;
+    right: 0;
+    z-index: 9991;
+    max-height: 400px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Hero: push review elements well below the fixed header */
+.review-active .hero.review-section>.review-section-label {
+    top: 84px !important;
+    z-index: 10;
+}
+
+.review-active .hero.review-section>.review-comment-btn {
+    top: 84px !important;
+    z-index: 10;
+}
+
+.review-active .hero .review-comments-list {
+    position: relative;
+    z-index: 10;
+}
+
 /* ---- Star Rating ---- */
 .review-rating {
     display: flex;

@@ -60,6 +60,7 @@ const EMAILJS_CONFIG = {
     'use strict';
 
     const SECTIONS = [
+        { selector: '#header', label: 'Seção 0 — Menu / Header' },
         { selector: '#hero', label: 'Seção 1 — Hero' },
         { selector: '.social-proof-bar', label: 'Seção 2 — Social Proof' },
         { selector: '.problem-section', label: 'Seção 3 — Problema / Empatia' },
